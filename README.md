@@ -1,38 +1,28 @@
 ## Offline Python Brute-Force Detector
-Small, standalone Python script which parses any SSH log file (offline, not in
+Small, standalone Python script which parses SSH log files (offline, not in
 real time) and reports IPs that appear to be performing brute-force attempts.
 Designed to improve my string-parsing skills as I prepared for a programming
 exam at university.
 <br>
-#### 1. Overview
-This tool takes in 2 options:
-1. Mode
-2. Server name
-It then parses a SSH log file (I conveniently supplied one in this repo), and
-performs checks based off the input options.
+#### This Is Version 2.0
+I rewrote the whole code from scratch for a few reasons:
+1. It was rather messy
+2. Improving it or adding new functionality will be annoying
+3. I wanted to add some of the features I considered adding before
 
-It works in the terminal, checking for repeated failed attempts within a set
-interval, returning (allegedly) malicious IPs upon detection, otherwise
-informing you no IPs were deemed to be malicious.
-
-It's designed to work entirely offline, though with some tinkering it could be
-configured to work on a live & ongoing log through something like a daemon
-script.
-
-This is *not* supposed to be a replacement to anything like `fail2ban`, it's
-purely a lightweight detector with a single function which I built in order to
-practice my string-parsing and general Python skills for an upcoming exam at
-university
-
-#### 2. Features
-- Parse standard SSH log files you see in places like `/var/log/auth.log`
-  *(Debian/Ubuntu)* or through `journalctl` on Arch Linux.
-- Configurable threshold and server name *(see `How To Run` section)*
+#### 1. Original Features:
+- Parse standard SSH log files
+- Configurable *(see `How To Run` section)*
 - Output directly in the terminal or to a file using the Linux `>` operator
+
+#### 2. New Features:
+- Made the program more configureable
+- Made a dedicated config file `detector.config`
+- Option to generate an `iptables` command to block IPs deemed malicious
 
 #### 3. Requirements
 - Python 3 *(3.10+ recommended)*
-- No mandatory external packages *(uses `sys` only)*
+- No mandatory extermal packages *(only uses `sys`)*
 
 #### 4. Installation
 Clone the repo or copy this script in a suitable location:
@@ -49,65 +39,64 @@ source .venv/bin/activate
 ```
 
 #### 5. How To Run
-Running it requires 2 options:
-1. The mode (strict, normal, loose)
-2. The name of the server you want to scan
-
-Run the file like this:
+The new version is much more straightforward to run. Here's the overview:
 ```bash
-python3 brute_force_detector.py <mode> <server name>
+python3 detector.py <options>
 ```
 
-Example:
-```bash
-python3 brute_force_detector.py normal db-server
-```
+The currently available options are:
+- --LOG\_FILE           the log file name (or path and name)
+- --FILE\_TYPE          log file type, only accepts 'sshd' for now
+- --INTERVAL            max time between failed attempts to class it as a
+                        brute-force attempt
+- --MAX\_ATTEMPTS       max failed attempts in quick succession to flag IP
+- --SERVER              the server to scan for
+- --GENERATE\_COMMAND   generate command to block malicious IPs, only accepts
+                        'iptables' for now
 
-**NOTE!** The mode and server name have to be written in that order.
+Some of these options also have default values which you can edit
+in `detector.config`:
+- --LOG\_FILE           ssh.log
+- --FILE\_TYPE          sshd
+- --INTERVAL            5
+- --MAX\_ATTEMPTS       10
+- --SERVER              server
 
 #### 6. Expected Log Formats
-Currently, the only supported log format is this:
-`Nov 04 00:00:01 server sshd[1001]: Server listening on 0.0.0.0 port 22`
+Currently, the only supported log format is the standard sshd log:
+`Nov 4 00:00:01 server sshd[1001]: Server listening on 0.0.0.0 port 22`
 Where you have:
-- Date in the format 'MMM DD` *(It's important the day is 2-digits long, even if
-  it has to be padded like `04` instead of just`4`)*
+- Date in the format `MMM DD`
 - Time in the format `HH:MM:SS` as standard
 - Server name after that
 - A colon `:` separating the information of the entry
+- Failed attempts are in the form "Failed \<...\> from \<ip\>"
 
-#### 7. Configuration
-Currently, the only way to configure the values is by editing the source code
-directly.
+*Note:* since the previous version, the date in `MMM DD` no longer has to be
+padded with a 0 to the left if it is a single digit.
 
-The configureable values are:
-- SSH_LOG:  name of the log file
-- INTERVAL: time between failed attempts to be classed as brute-force
-- SERVERS:  list of all server names in the log file
-- MODES:    how many failed attempts in quick succession will flag an IP
-
-#### 8. Output
+#### 7. Output
 Outputs will take 1 of 2 forms:
-1. `Potential brute force from x.x.x.x` if an IP is deemed malicious. This may
+1. `Malicious IP detected: x.x.x.x` if an IP is deemed malicious. This may
    produce several lines if multiple IPs seem suspicious
-2. `No brute force attacks detected.` if no IPs are deemed malicious.
+2. `No malicious IPs detected!` if no IPs are deemed malicious.
+3. Additionally, lines with commands may be generated if the option is included
 
-#### 9. Limitations
+#### 8. Limitations
 - As this is a project made for me to essentially learn Python, it is not
   designed to handle multi-GB log files and will likely run extremely slowly.
 
-  The supplied `ssh.log` file is 388Kb and takes the program about 0.07s to
-  parse, meaning a 1Gb log file will likely take around 30-40min to parse.
-
-- If the day is not padded with a zero to make it 2-digits, the
-  program will fail.
+  The supplied `ssh.log` file is 404K and takes the program about 0.07s to
+  parse, meaning a 1G log file will likely take around 30-40min to parse.
 
 - If multiple users are sharing an IP through something like an NAT and they
   fail their logins in quick succession, it may be flagged as malicious
 
 #### 10. Development Notes (Potential Future Features)
-1. Add more options *(e.g. select date range to check, exclude certain IPs,
-   etc.)*
-2. Create a dedicated config file to make configuration easier
-3. Produce commands to block IPs *(e.g. iptables or firewalls)*
-4. Extend accepted file types
+So far, I've already included a few of the original features I wanted to revisit
+and include.
 
+Future features may include:
+- Adding even more options (e.g. select date range, exclude certain IPs, etc.)
+- Produce commands to block IPs besides for apps beyond `iptables`
+- Extend accepted file types
