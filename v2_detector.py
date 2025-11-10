@@ -7,8 +7,10 @@ f.close()
 # constants
 VALID_OPTIONS = [
         "FILE_TYPE", "INTERVAL", "MAX_ATTEMPTS", "SERVER", \
-        "GENERATE_COMMAND", "LOG_FILE"
+        "GENERATE_COMMAND", "LOG_FILE", "EXCLUDE_IP", \
+        "BEFORE", "AFTER"
         ]
+
 YEAR_IN_SECONDS = 31556952
 MONTH_IN_SECONDS = 2629746
 DAY_IN_SECONDS = 86400
@@ -36,17 +38,22 @@ for line in config:
     if len(line) > 0 and line[0] != '#':
         option = line.split('=')[0].strip()
         values = line.split('=')[1].strip()
-
+        
+        # split comma-separated options into lists
         if ',' not in values:
             options[option] = values
-        # unnecessary right now, but will make future updates easier
         else:
             options[option] = [value.strip() for value in values.split(',')]
 
 # set user-defined options
 for i in range(1, len(sys.argv), 2):
     if sys.argv[i][:2] == '--' and sys.argv[i][2:].upper() in VALID_OPTIONS:
-        options[sys.argv[i][2:].upper()] = sys.argv[i + 1]
+
+        if ',' not in sys.argv[i+1]:
+            options[sys.argv[i][2:].upper()] = sys.argv[i + 1]
+        else:
+            options[sys.argv[i][2:].upper()] = \
+                    [value.strip() for value in sys.argv[i + 1].split(',')]
     else:
         print("Invalid option:", sys.argv[i])
         exit()
@@ -55,25 +62,29 @@ for i in range(1, len(sys.argv), 2):
 # helper functions
 # ----------------
 
+# convert date to seconds
+def dtos(date):
+    date_s = (int(date[:2]) - 1) * MONTH_IN_SECONDS + \
+                    (int(date[3:5]) - 1) * DAY_IN_SECONDS + \
+                    int(date[6:8]) * HOUR_IN_SECONDS + \
+                    int(date[9:11]) * MINUTE_IN_SECONDS + \
+                    int(date[12:])
+    return date_s
+
+# convert time boundaries to seconds
+options["BEFORE"] = dtos(options["BEFORE"])
+options["AFTER"] = dtos(options["AFTER"])
+
 # get difference between 2 timestamps in seconds
-# input = MM:DD:HH:MM:SS (month:day:hour:minute:second)
 def time_difference(d1, d2):
-    d1_in_seconds = (int(d1[:2]) - 1) * MONTH_IN_SECONDS + \
-                    (int(d1[3:5]) - 1) * DAY_IN_SECONDS + \
-                    int(d1[6:8]) * HOUR_IN_SECONDS + \
-                    int(d1[9:11]) * MINUTE_IN_SECONDS + \
-                    int(d1[12:])
-    d2_in_seconds = (int(d2[:2]) - 1) * MONTH_IN_SECONDS + \
-                    (int(d2[3:5]) - 1) * DAY_IN_SECONDS + \
-                    int(d2[6:8]) * HOUR_IN_SECONDS + \
-                    int(d2[9:11]) * MINUTE_IN_SECONDS + \
-                    int(d2[12:])
+    d1_in_seconds = dtos(d1)
+    d2_in_seconds = dtos(d2)
 
     # if d2 < d1, a New Year's was in between
     if d2_in_seconds < d1_in_seconds:
         d2_in_seconds += YEAR_IN_SECONDS
     
-    return abs(d2_in_seconds - d1_in_seconds)
+    return d2_in_seconds - d1_in_seconds
 
 # formatting for the standard sshd log file
 def format_sshd(f):
@@ -105,10 +116,19 @@ def format_sshd(f):
 def check_ip(time):
     fast_fail_count = 0
     for i in range(1, len(time)):
-        if time_difference(time[i - 1], time[i]) < int(options["INTERVAL"]):
+        if not date_in_range(time[i]):
+            continue
+        if abs(time_difference(time[i - 1], time[i])) < int(options["INTERVAL"]):
             fast_fail_count += 1
         if fast_fail_count >= int(options["MAX_ATTEMPTS"]):
             return True
+    return False
+
+def date_in_range(date):
+    date_s = dtos(date)
+
+    if (date_s - options["BEFORE"] < 0) and (date_s - options["AFTER"] > 0):
+        return True
     return False
 
 # -------------
@@ -140,7 +160,8 @@ def run_detector():
 
     for ip in failed_ips:
         if len(failed_ips[ip]) > int(options["MAX_ATTEMPTS"]) \
-                and check_ip(failed_ips[ip]) == True:
+                and check_ip(failed_ips[ip]) == True \
+                and ip not in options["EXCLUDE_IP"]:
             malicious_ips.append(ip)
     return malicious_ips
 

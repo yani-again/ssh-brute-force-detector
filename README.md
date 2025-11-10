@@ -4,6 +4,15 @@ real time) and reports IPs that appear to be performing brute-force attempts.
 Designed to improve my string-parsing skills as I prepared for a programming
 exam at university.
 <br>
+
+#### New Changes
+1. Added new options:
+    - --BEFORE and --AFTER to search for a specific date range (*NOTE!* Use it
+      by adding the FULL date in the format `MM:DD:HH:MM:SS`, use default value
+      for reference in the config file)
+    - --EXCLUDE\_IP to exclude IPs from the search, can be a comma-separated
+      list to exclude multiple IPs
+
 #### This Is Version 2.0
 I rewrote the whole code from scratch for a few reasons:
 1. It was rather messy
@@ -97,6 +106,6 @@ So far, I've already included a few of the original features I wanted to revisit
 and include.
 
 Future features may include:
-- Adding even more options (e.g. select date range, exclude certain IPs, etc.)
+- Adding even more options
 - Produce commands to block IPs besides for apps beyond `iptables`
 - Extend accepted file types
